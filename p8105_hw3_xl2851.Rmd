@@ -1,0 +1,56 @@
+---
+title: "p8105_hw3_xl2851"
+output: github_document
+---
+# problem 1
+## 1.1 How many aisles are there, and which aisles are the most items ordered from?
+```{r}
+library(p8105.datasets)
+library(tidyr)
+library(tidyverse)
+data("instacart")
+
+```
+
+```{r}
+aisle_count=
+instacart %>%
+  group_by(aisle) %>%
+  summarize(number_of_items=n())%>%
+  arrange(desc(number_of_items))
+```
+
+There are 134 aisles. Fresh vegetables are the most items ordered from.
+
+## 1.2 Make a plot that shows the number of items ordered in each aisle, limiting this to aisles with more than 10000 items ordered.
+```{r}
+plot_aisle =
+  aisle_count %>%
+  filter(number_of_items>10000)%>%
+  ggplot(aes(x=aisle, y=number_of_items))
+
+plot_aisle+geom_point()
+```
+
+## 1.3 Make a table showing the three most popular items in each of the aisles
+```{r}
+pop_item=
+  instacart %>%
+  filter(aisle == c("baking ingredients","dog food care","packaged vegetables fruits"))%>%
+  group_by(aisle,product_name)%>%
+  count()%>%
+  summarize(
+    order_max=max(n))
+```
+
+## 1.4 Make a table showing the mean hour of the day at which Pink Lady Apples and Coffee Ice Cream are ordered on each day of the week
+```{r}
+mean_hour=
+  instacart %>%
+  filter(product_name==c("Pink Lady Apples","Coffee Ice Cream"))%>%
+  group_by(order_dow)%>%
+  summarize(
+    mean=mean(order_hour_of_day)
+  )
+```
+
