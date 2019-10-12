@@ -54,6 +54,10 @@ plot_aisle+geom_point()
   knitr::kable()
 ```
 
+There are `r nrow(instacart)` rows and `r ncol(instacart)` columns in data 'instacart'.
+There are `r nrow(distinct(instacart, aisle))` distinct aisles. 
+Some key variables include `r nrow(distinct(instacart, order_id))` distinct order_id and `r nrow(distinct(instacart, user_id))` distinct user_id.
+
 # problem 2
 ## clean the data
 ```{r}
@@ -82,4 +86,46 @@ tidied_brfss=
   knitr::kable()
 ```
 
-## Make a “spaghetti” plot  
+## Construct a dataset that is limited to Excellent responses, and contains, year, state, and a variable that averages the data_value across locations within a state. 
+
+```{r}
+brfss_new =
+  tidied_brfss %>% 
+  filter(response == "Excellent") %>% 
+  group_by(year, locationabbr) %>% 
+  mutate(mean = mean(data_value, na.rm = FALSE)) %>%
+  select(year, locationabbr, mean) %>% 
+  distinct() 
+```
+
+## Make a “spaghetti” plot 
+```{r}
+ggplot(brfss_new, aes(x = year, y = mean, color = locationabbr, group = locationabbr))+
+  geom_line() +
+  theme(legend.position="none") +
+  xlab("Year") +
+  ylab("The average value within a state") +
+  ggtitle("The average value over time within a state")
+```
+
+## two-panel plot
+```{r}
+  tidied_brfss %>%
+  filter(locationabbr=="NY",year %in% c(2006, 2010))%>%
+  ggplot(aes(x = response, y = data_value )) +
+  geom_boxplot(alpha = .5)+
+  facet_grid(~year)+
+  viridis::scale_fill_viridis(discrete = TRUE)
+```
+
+# problem 3
+```{r}
+accel_data=read_csv("./accel_data.csv")%>%
+  pivot_longer(
+    activity.1:activity.1440,
+    names_to = "activity",
+    values_to = "count"
+  )
+  
+```
+
