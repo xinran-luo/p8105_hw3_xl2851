@@ -27,7 +27,12 @@ There are 134 aisles. Fresh vegetables are the most items ordered from.
 plot_aisle =
   aisle_count %>%
   filter(number_of_items>10000)%>%
-  ggplot(aes(x=number_of_items, y=aisle))
+  ggplot(aes(x=number_of_items, y=aisle))+
+   labs(
+    title = "Aisles plot",
+    x = "names of aisles",
+    y = "number of items ordered in each aisle",
+    caption = "Data from instacart")
 
 plot_aisle+geom_point()
 ```
@@ -51,12 +56,14 @@ plot_aisle+geom_point()
   summarize(
     mean=mean(order_hour_of_day)
   )%>%
-  knitr::kable()
+  knitr::kable(digits=1)
 ```
+
+According to the table, the lastest mean onder hour(14.5) is on Wednesday.
 
 There are `r nrow(instacart)` rows and `r ncol(instacart)` columns in data 'instacart'.
 There are `r nrow(distinct(instacart, aisle))` distinct aisles. 
-Some key variables include `r nrow(distinct(instacart, order_id))` distinct order_id and `r nrow(distinct(instacart, user_id))` distinct user_id.
+Some key variables include (add later)
 
 # problem 2
 ## clean the data
@@ -65,6 +72,7 @@ data("brfss_smart2010")
 tidied_brfss=
   filter(brfss_smart2010,Topic=="Overall Health")%>%
   janitor::clean_names() %>%
+  rename(state = "locationabbr", location = "locationdesc")%>%
   mutate(
     response=as.factor(response),
     response = forcats::fct_relevel(response, c("Poor","Fair","Good", "Very good","Excellent")))
@@ -73,18 +81,20 @@ tidied_brfss=
 
 ## In 2002, which states were observed at 7 or more locations? What about in 2010?
 ```{r}
-  separate(tidied_brfss,locationdesc,c("state","county"))%>%
+  tidied_brfss%>%
   group_by(state,year)%>%
-  summarise(n_location=n_distinct(county))%>%
+  summarise(n_location=n_distinct(location, na.rm = FALSE))%>%
   filter(n_location>=7, year==2002)%>%
   knitr::kable()
 
-  separate(tidied_brfss,locationdesc,c("state","county"))%>%
+  tidied_brfss%>%
   group_by(state,year)%>%
-  summarise(n_location=n_distinct(county))%>%
+  summarise(n_location=n_distinct(location, na.rm = FALSE))%>%
   filter(n_location>=7, year==2010)%>%
   knitr::kable()
 ```
+
+According to the table, in 2002, CT, FL, MA, NC, NJ and PA were observed at 7 or more locations. In 2010, CA, CO, FL, MA, MD, NC, NE, NJ, NY, OH, PA, SC, TX and WA were observed at 7 or more locations.
 
 ## Construct a dataset that is limited to Excellent responses, and contains, year, state, and a variable that averages the data_value across locations within a state. 
 
@@ -92,40 +102,82 @@ tidied_brfss=
 brfss_new =
   tidied_brfss %>% 
   filter(response == "Excellent") %>% 
-  group_by(year, locationabbr) %>% 
+  group_by(year, location) %>% 
   mutate(mean = mean(data_value, na.rm = FALSE)) %>%
-  select(year, locationabbr, mean) %>% 
+  select(year, location, mean) %>% 
   distinct() 
 ```
 
 ## Make a “spaghetti” plot 
 ```{r}
-ggplot(brfss_new, aes(x = year, y = mean, color = locationabbr, group = locationabbr))+
+ggplot(brfss_new, aes(x = year, y = mean, color = location, group = location))+
   geom_line() +
   theme(legend.position="none") +
   xlab("Year") +
-  ylab("The average value within a state") +
+  ylab("Mean value") +
   ggtitle("The average value over time within a state")
 ```
+
+The plots shows the average data_value across location within a state with "year" as the x-axis and "mean value" as the y-axis.
 
 ## two-panel plot
 ```{r}
   tidied_brfss %>%
-  filter(locationabbr=="NY",year %in% c(2006, 2010))%>%
-  ggplot(aes(x = response, y = data_value )) +
+  filter(state=="NY",year %in% c(2006, 2010))%>%
+  ggplot(aes(x = response, y = data_value, color=response)) +
   geom_boxplot(alpha = .5)+
   facet_grid(~year)+
-  viridis::scale_fill_viridis(discrete = TRUE)
+  theme(text = element_text(size=12),
+         axis.text.x = element_text(angle=90, vjust=0.5)) +
+  labs(
+    title = "Distribution of data_value for responses among locations in NY State",
+    x = "Response",
+    y = "data_value")
 ```
+
+The two-panel plot shows for the years 2006, and 2010, distribution of data_value for responses (“Poor” to “Excellent”) among locations in NY State. Within these 2 years, the distribution of response is similar but in 2010 there were more "very good" responses.
 
 # problem 3
 ```{r}
 accel_data=read_csv("./accel_data.csv")%>%
+   janitor::clean_names() %>%
+  mutate(
+    type = case_when(
+      day %in% c("Saturday", "Sunday") ~ "weekend",
+      day %in% c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday") ~ "weekday", TRUE~""),
+    day = as.factor(day),
+    day = forcats::fct_relevel(day, c("Sunday","Monday","Tuesday","Wednesday","Thursday", "Friday", "Saturday"))) %>% 
   pivot_longer(
-    activity.1:activity.1440,
+    activity_1:activity_1440,
     names_to = "activity",
+    names_prefix = "activity_",
     values_to = "count"
   )
-  
 ```
 
+The dataset, "accel_data", has `r nrow(accel_data)` observations and `r ncol(accel_data)` variables. Key variables are week, type, day activity and count.
+
+## aggregate accross minutes to create a total activity variable for each day
+```{r}
+accel_data %>% 
+  group_by(week,day, day_id) %>%
+  summarize(activity_total = sum(count)) %>% 
+  knitr::kable()
+```
+
+I did not see any apparent trends.
+
+## Make a single-panel plot that shows the 24-hour activity time courses for each day 
+```{r}
+  accel_data %>% 
+  group_by(week,day, day_id) %>%
+  summarize(activity_total = sum(count))%>%
+  rowid_to_column("ID")%>%
+    ggplot(aes(x = ID, y = activity_total)) +
+    geom_point(aes(color = day), alpha = .5) +
+    geom_smooth(se = FALSE)+
+labs(
+    title = "24-hour activity time courses for each day",
+    x = "ID",
+    y = "activity_total")
+```
