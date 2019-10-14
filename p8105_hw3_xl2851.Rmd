@@ -146,24 +146,28 @@ According to the table, in 2002, 6 states(CT, FL, MA, NC, NJ and PA) were observ
 
 ## Construct a dataset that is limited to Excellent responses, and contains, year, state, and a variable that averages the data_value across locations within a state. 
 
+
 ```{r}
 brfss_new =
   tidied_brfss %>% 
   filter(response == "Excellent") %>% 
-  group_by(year, location) %>% 
+  group_by(state, year) %>% 
   mutate(mean = mean(data_value, na.rm = FALSE)) %>%
-  select(year, location, mean) %>% 
+  select(year, state, mean) %>% 
   distinct() 
-```
+``` 
+
 
 ## Make a “spaghetti” plot 
 ```{r}
-ggplot(brfss_new, aes(x = year, y = mean, color = location, group = location))+
+brfss_new%>%
+ggplot(aes(x = year, y = mean, color = state)）+
   geom_line() +
-  theme(legend.position="none") +
-  xlab("Year") +
-  ylab("Mean value") +
-  ggtitle("The average value over time within a state")
+   labs(
+    title = "Average data value over time within a state across years(%)",
+    x = "Year",
+    y = "Average data value (%)"
+  ) 
 ```
 
 The plots shows the average data_value across location within a state with "year" as the x-axis and "mean value" as the y-axis.
