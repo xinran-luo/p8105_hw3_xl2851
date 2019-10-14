@@ -8,6 +8,7 @@ output: github_document
 library(p8105.datasets)
 library(tidyr)
 library(tidyverse)
+library(ggridges)
 data("instacart")
 
 ```
@@ -20,81 +21,128 @@ instacart %>%
   arrange(desc(number_of_items))
 ```
 
-There are 134 aisles. Fresh vegetables are the most items ordered from.
+There are `r nrow(distinct(instacart, aisle))` distinct aisles. 
+Fresh vegetables are the most items ordered from.
 
 ## 1.2 Make a plot that shows the number of items ordered in each aisle, limiting this to aisles with more than 10000 items ordered.
 ```{r}
-plot_aisle =
-  aisle_count %>%
-  filter(number_of_items>10000)%>%
-  ggplot(aes(x=number_of_items, y=aisle))+
-   labs(
-    title = "Aisles plot",
+instacart %>% 
+  group_by(aisle) %>% 
+  summarize(n_aisle = n()) %>% 
+  arrange(desc(n_aisle)) %>% 
+  mutate(aisle = forcats::fct_reorder(aisle, n_aisle, .desc = FALSE)) %>% 
+  filter(n_aisle>=10000) %>% 
+      ggplot(aes(x = aisle, y = n_aisle)) +
+  geom_bar(stat = "identity") +
+  coord_flip() +
+  labs(title = "number of items ordered in each aisle",
     x = "names of aisles",
-    y = "number of items ordered in each aisle",
-    caption = "Data from instacart")
-
-plot_aisle+geom_point()
+    y = "number of items",
+    caption = "Data from instacart")+
+theme(axis.text.y = element_text(angle = 0, hjust = 1))
 ```
 
 ## 1.3 Make a table showing the three most popular items in each of the aisles
 ```{r}
+  popular_product=
   instacart %>%
   filter(aisle == c("baking ingredients","dog food care","packaged vegetables fruits"))%>%
   group_by(aisle)%>%
   count(product_name, name="num_of_items")%>%
   arrange(desc(num_of_items))%>%
-  top_n(3)%>%
-  knitr::kable()
+  top_n(3)
+    knitr::kable(popular_product,
+               col.names = c("Aisle", "Most Popular Items", "Number of Items"),
+               format = "html",
+               caption = "The 3 most popular items in each of the 3 aisles"
+               )
 ```
 
 ## 1.4 Make a table showing the mean hour of the day at which Pink Lady Apples and Coffee Ice Cream are ordered on each day of the week
+
 ```{r}
-  instacart %>%
-  filter(product_name==c("Pink Lady Apples","Coffee Ice Cream"))%>%
-  group_by(order_dow)%>%
-  summarize(
-    mean=mean(order_hour_of_day)
-  )%>%
-  knitr::kable(digits=1)
+mean_hour = instacart %>% 
+   filter(product_name %in% c("Pink Lady Apples", "Coffee Ice Cream")) %>% 
+  group_by(product_name, order_dow) %>%
+  summarize(mean_hour_of_day = mean(order_hour_of_day)) %>%
+  pivot_wider(
+    names_from = "order_dow",
+    values_from = "mean_hour_of_day"
+  )
+knitr::kable(mean_hour, 
+             format = "html",
+             caption = "The mean hour of the day at which Pink Lady Apples and Coffee Ice Cream are ordered on each day of the week",
+             col.names = c("Product Name", "Sunday", "Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"),
+             digits = 1)
+
 ```
 
-According to the table, the lastest mean onder hour(14.5) is on Wednesday.
+According to the table, the mean order hour of Coffee Ice Cream on Tuesday is the latest (15.4) and the mean order hour of Pink Lady Apples on Wednesday is the latest (14.2).
 
 There are `r nrow(instacart)` rows and `r ncol(instacart)` columns in data 'instacart'.
-There are `r nrow(distinct(instacart, aisle))` distinct aisles. 
-Some key variables include (add later)
+
+Each row in the dataset is a product from an order. There is a single order per user in this dataset.
+
+Some key variables include:
+
+order_dow: the day of the week on which the order was placed
+
+order_hour_of_day: the hour of the day on which the order was placed
+
+days_since_prior_order: days since the last order, capped at 30, NA if order_number=1
+
+product_name: name of the product
+
+aisle: the name of the aisle
+
+department: the name of the department
+
+Take the first observation as an example: 
+Customer with user_id "112108" ordered Bulgarian Yogurt(product ID 49302) from yogurt aisle in dairy eggs department on Thursday 10am, 9 days after his/her last order. This order belongs to the train evaluation set.
+
+
 
 # problem 2
 ## clean the data
 ```{r}
 data("brfss_smart2010")
-tidied_brfss=
-  filter(brfss_smart2010,Topic=="Overall Health")%>%
-  janitor::clean_names() %>%
-  rename(state = "locationabbr", location = "locationdesc")%>%
-  mutate(
-    response=as.factor(response),
-    response = forcats::fct_relevel(response, c("Poor","Fair","Good", "Very good","Excellent")))
 
+tidied_brfss = 
+  brfss_smart2010 %>% 
+  janitor::clean_names() %>%
+  rename(state = "locationabbr", location = "locationdesc") %>% 
+  filter(topic == "Overall Health") %>%  
+  filter(response %in% c("Excellent", "Very good", "Good", "Fair", "Poor")) %>%
+  mutate(response = as.factor(response),
+         response = forcats::fct_relevel(response, c("Poor","Fair","Good", "Very good","Excellent")))
 ```
 
 ## In 2002, which states were observed at 7 or more locations? What about in 2010?
 ```{r}
+  obs_state_2002=
   tidied_brfss%>%
-  group_by(state,year)%>%
+  filter(year==2002)%>%
+  group_by(state)%>%
   summarise(n_location=n_distinct(location, na.rm = FALSE))%>%
-  filter(n_location>=7, year==2002)%>%
-  knitr::kable()
+  filter(n_location>=7)
+  knitr::kable(obs_state_2002,
+             col.names = c("State", "Number of observed Locations"),
+             format = "html",
+             caption = "The states that were observed at 7 or more locations in 2002")
 
+obs_state_2010=
   tidied_brfss%>%
-  group_by(state,year)%>%
+  filter(year==2010)%>%
+  group_by(state)%>%
   summarise(n_location=n_distinct(location, na.rm = FALSE))%>%
-  filter(n_location>=7, year==2010)%>%
-  knitr::kable()
+  filter(n_location>=7)
+  knitr::kable(obs_state_2010,
+             col.names = c("State", "Number of observed Locations"),
+             format = "html",
+             caption = "The states that were observed at 7 or more locations in 2010")
 ```
 
-According to the table, in 2002, CT, FL, MA, NC, NJ and PA were observed at 7 or more locations. In 2010, CA, CO, FL, MA, MD, NC, NE, NJ, NY, OH, PA, SC, TX and WA were observed at 7 or more locations.
+According to the table, in 2002, 6 states(CT, FL, MA, NC, NJ and PA) were observed at 7 or more locations. In 2010, 14 states(CA, CO, FL, MA, MD, NC, NE, NJ, NY, OH, PA, SC, TX and WA) were observed at 7 or more locations.
 
 ## Construct a dataset that is limited to Excellent responses, and contains, year, state, and a variable that averages the data_value across locations within a state. 
 
@@ -121,48 +169,56 @@ ggplot(brfss_new, aes(x = year, y = mean, color = location, group = location))+
 The plots shows the average data_value across location within a state with "year" as the x-axis and "mean value" as the y-axis.
 
 ## two-panel plot
+
 ```{r}
-  tidied_brfss %>%
+ tidied_brfss %>%
   filter(state=="NY",year %in% c(2006, 2010))%>%
-  ggplot(aes(x = response, y = data_value, color=response)) +
-  geom_boxplot(alpha = .5)+
-  facet_grid(~year)+
-  theme(text = element_text(size=12),
-         axis.text.x = element_text(angle=90, vjust=0.5)) +
+ggplot(aes(fill= response, y=data_value, x=location)) +
+  geom_bar(position = "fill",stat = "identity")+
+  facet_grid(.~year) +
+  coord_flip() +
   labs(
-    title = "Distribution of data_value for responses among locations in NY State",
-    x = "Response",
-    y = "data_value")
+        title = "distribution of data_value for responses",
+        y = "Average data_value",
+        x = "response",
+        caption = "Data from p8105.datasets package") +
+  theme(legend.position = "bottom")
 ```
 
 The two-panel plot shows for the years 2006, and 2010, distribution of data_value for responses (“Poor” to “Excellent”) among locations in NY State. Within these 2 years, the distribution of response is similar but in 2010 there were more "very good" responses.
 
 # problem 3
 ```{r}
-accel_data=read_csv("./accel_data.csv")%>%
+accel_data=read_csv("./data/accel_data.csv")%>%
    janitor::clean_names() %>%
-  mutate(
-    type = case_when(
-      day %in% c("Saturday", "Sunday") ~ "weekend",
-      day %in% c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday") ~ "weekday", TRUE~""),
-    day = as.factor(day),
-    day = forcats::fct_relevel(day, c("Sunday","Monday","Tuesday","Wednesday","Thursday", "Friday", "Saturday"))) %>% 
-  pivot_longer(
+    pivot_longer(
     activity_1:activity_1440,
     names_to = "activity",
     names_prefix = "activity_",
-    values_to = "count"
-  )
+    values_to = "count")%>%
+    mutate(
+    activity=as.numeric(activity),
+    day_type = case_when(
+      day %in% c("Saturday", "Sunday") ~ "weekend",
+      day %in% c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday") ~ "weekday", TRUE~""),
+    day = as.factor(day),
+    day = forcats::fct_relevel(day, c("Sunday","Monday","Tuesday","Wednesday","Thursday", "Friday", "Saturday")))  
+  
+
 ```
 
-The dataset, "accel_data", has `r nrow(accel_data)` observations and `r ncol(accel_data)` variables. Key variables are week, type, day activity and count.
+The dataset, "accel_data", has `r nrow(accel_data)` observations and `r ncol(accel_data)` variables. Key variables are week, day_type, day, activity and count.
 
 ## aggregate accross minutes to create a total activity variable for each day
 ```{r}
+day_activity=
 accel_data %>% 
-  group_by(week,day, day_id) %>%
-  summarize(activity_total = sum(count)) %>% 
-  knitr::kable()
+  group_by(week,day) %>%
+  summarize(activity_total = sum(count)) 
+  knitr::kable(day_activity,
+               format = "html",
+             caption = "Total activity counts for each day",
+             digits = 0)
 ```
 
 I did not see any apparent trends.
@@ -170,14 +226,14 @@ I did not see any apparent trends.
 ## Make a single-panel plot that shows the 24-hour activity time courses for each day 
 ```{r}
   accel_data %>% 
-  group_by(week,day, day_id) %>%
-  summarize(activity_total = sum(count))%>%
-  rowid_to_column("ID")%>%
-    ggplot(aes(x = ID, y = activity_total)) +
-    geom_point(aes(color = day), alpha = .5) +
-    geom_smooth(se = FALSE)+
+     ggplot(aes(x = activity, y = count,color=day)) +
+    geom_line(se = FALSE)+
 labs(
     title = "24-hour activity time courses for each day",
-    x = "ID",
-    y = "activity_total")
+    x = "activity",
+    y = "activity_count_minute")+
+  scale_x_continuous(
+    breaks  = c(120,240,360,480,600,720,840, 960, 1080, 1200, 1320, 1440), 
+    limits = c(0, 1440)
+    ) + theme(axis.text.x = element_text(angle = 60, hjust = 1))
 ```
